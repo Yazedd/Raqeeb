@@ -1886,3 +1886,21 @@ body.lockdown:after {
     scroll-behavior:auto!important
   }
 }
+.webcam-controls { display:flex; align-items:center; gap:24px; flex-wrap:wrap; padding:15px 18px; }
+.webcam-controls label { display:flex; align-items:center; gap:12px; font-size:12px; }
+.webcam-controls select { background:var(--c2); color:var(--tx); border:1px solid var(--bd); border-radius:6px; padding:9px 12px; max-width:350px; }
+.webcam-controls>.mu { font-size:11px; }
+.webcam-grid { display:grid; grid-template-columns:minmax(0,2fr) minmax(260px,1fr); gap:20px; align-items:start; }
+.webcam-grid>aside { min-width:0; }
+.webcam-stage { aspect-ratio:16/9; max-height:none; width:100%; }
+.webcam-stage>img { position:absolute; inset:0; width:100%; height:100%; object-fit:fill; }
+.webcam-preview { aspect-ratio:16/9; position:relative; background:var(--video-bg); overflow:hidden; }
+.webcam-preview video { width:100%; height:100%; object-fit:contain; }
+.webcam-preview.preview-idle:after { content:'CAMERA OFF'; position:absolute; inset:0; display:grid; place-items:center; color:var(--mu); font-size:10px; letter-spacing:2px; }
+[lang=ar] .webcam-preview.preview-idle:after { content:'الكاميرا متوقفة'; letter-spacing:0; }
+.webcam-note { padding:15px 17px; font-size:11px; line-height:1.8; }
+.webcam-help { display:grid; gap:15px; }
+.webcam-help p { font-size:12px; line-height:1.8; }
+.webcam-error { color:var(--rd); background:color-mix(in srgb,var(--rd) 8%,var(--card)); border:1px solid color-mix(in srgb,var(--rd) 40%,var(--bd)); padding:15px; border-radius:8px; }
+@media(max-width:1100px) { .webcam-grid { grid-template-columns:1fr; } .webcam-grid>aside { grid-template-columns:1fr 1fr; } }
+@media(max-width:700px) { .webcam-grid>aside { grid-template-columns:1fr; } .webcam-controls { gap:12px; } .webcam-controls label { width:100%; } .webcam-controls select { min-width:0; width:100%; } }

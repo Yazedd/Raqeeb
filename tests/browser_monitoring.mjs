@@ -37,12 +37,12 @@ try {
   };
   const until=async (expression,timeout=30000)=>{const end=Date.now()+timeout;while(Date.now()<end){if(await evaluate(expression))return;await sleep(300);}throw new Error('Timed out: '+expression);};
   await cdp('Runtime.enable'); await cdp('Page.enable');
-  await until('typeof D !== "undefined" && D.cameras.length === 2 && D.analyses.size === 2',300000);
+  await until('typeof D !== "undefined" && D.cameras.filter(c=>c.source_type!=="webcam").length === 2 && D.analyses.has("CAM-01") && D.analyses.has("CAM-03")',300000);
   await until('document.querySelectorAll("video[data-camera]").length === 2 && [...document.querySelectorAll("video")].every(v=>v.readyState>=2)',30000);
   assert.equal(await evaluate('D.view'),'live');
-  assert.deepEqual(await evaluate('D.cameras.map(c=>c.id)'),['CAM-01','CAM-03']);
+  assert.deepEqual(await evaluate('D.cameras.filter(c=>c.source_type!=="webcam").map(c=>c.id)'),['CAM-01','CAM-03']);
   assert(await evaluate('tracks().filter(t=>t.class==="person").every(t=>/^P-\\d{4}$/.test(t.track))'),'Person IDs must be independent of camera IDs');
-  const detections=await evaluate('[...D.analyses.values()].map(a=>({camera:a.camera,gun:a.events.find(e=>e.class==="gun")}))');
+  const detections=await evaluate('[...D.analyses.values()].filter(a=>a.source_type!=="webcam").map(a=>({camera:a.camera,gun:a.events.find(e=>e.class==="gun")}))');
   assert(detections.every(d=>d.gun),'Both remaining videos must have a genuine inferred gun occurrence');
   assert(detections.find(d=>d.camera==='CAM-01').gun.time<10,'CAM-01 recognition must improve on the old 21.5-second detection');
   console.log('Verified camera assignments, independent person IDs, and gun timestamps:',JSON.stringify(detections));
@@ -56,7 +56,7 @@ try {
   await evaluate(`openPerson('${people[0].id}')`);
   await until('document.querySelector(".person-profile img").naturalWidth>0');
   await evaluate('closeM()');
-  for(const view of ['overview','alerts','people','cams','inc','evid','ana','health','set','live']) {
+  for(const view of ['overview','alerts','people','cams','inc','evid','ana','health','set','webcam','live']) {
     await evaluate(`go('${view}')`); assert(await evaluate('document.querySelector("#main").innerText.length>20'));
     assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false,view+' desktop overflow');
     await evaluate('document.fonts.ready'); await sleep(120);
@@ -74,7 +74,7 @@ try {
   const desktop=await cdp('Page.captureScreenshot',{format:'png'});
   await writeFile(join(out,'raqeeb-monitoring.png'),Buffer.from(desktop.data,'base64'));
   await evaluate('[...document.querySelectorAll("video")].forEach(v=>v.pause())');
-  const events=await evaluate('[...D.analyses.values()].flatMap(a=>a.events)');
+  const events=await evaluate('[...D.analyses.values()].filter(a=>a.source_type!=="webcam").flatMap(a=>a.events)');
   assert(events.every(e=>e.class==='gun'),'These clips must not produce the observed false knife alerts');
   const cam03=events.filter(e=>e.camera==='CAM-03');
   assert.equal(new Set(cam03.map(e=>e.person_id)).size,2,'Both CAM-03 gun holders must be recovered');
@@ -102,7 +102,7 @@ try {
   await evaluate('toggleChat()');
   await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
   await sleep(300);
-  for(const view of ['overview','people','alerts','cams','evid','ana','health','set','live']) {
+  for(const view of ['overview','people','alerts','cams','evid','ana','health','set','webcam','live']) {
     await evaluate(`go('${view}')`); await sleep(70);
     assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false,view+' mobile overflow');
     if(['overview','people'].includes(view)) {

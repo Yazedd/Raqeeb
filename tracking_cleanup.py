@@ -12,6 +12,11 @@ def similarity(a, b):
 
 
 def consolidate(data, evidence, registry, source_hash, encoder_path=None, features=None):
+    with registry.lock:
+        return _consolidate(data, evidence, registry, source_hash, encoder_path, features)
+
+
+def _consolidate(data, evidence, registry, source_hash, encoder_path=None, features=None):
     if data.get("consolidation_version") == VERSION:
         return data
     observations = collections.defaultdict(list)

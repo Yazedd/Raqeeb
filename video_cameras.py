@@ -60,16 +60,17 @@ class PersonIDs:
 
     def __init__(self, path):
         self.path = path
+        self.lock = threading.RLock()
         self.data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
     def resolve(self, source_hash, track_id):
-        key = f"{source_hash}:{track_id}"
-        if key not in self.data:
-            number = max((int(v.split("-")[1]) for v in self.data.values()), default=0) + 1
-            self.data[key] = f"P-{number:04d}"
-            json_write(self.path, self.data)
-        return self.data[key]
-
+        with self.lock:
+            key = f"{source_hash}:{track_id}"
+            if key not in self.data:
+                number = max((int(v.split("-")[1]) for v in self.data.values()), default=0) + 1
+                self.data[key] = f"P-{number:04d}"
+                json_write(self.path, self.data)
+            return self.data[key]
 
 def detect_weapons(model, image, people, classes, confidence):
     """Magnify small objects, then merge overlapping predictions in source pixels."""
@@ -330,12 +331,15 @@ class CameraLibrary:
             cap.release()
             self.cameras[cid] = camera
         json_write(camera_path, camera_ids)
-        # Keep real, persisted evidence only for the videos currently installed.
+        from live_webcam import WebcamEngine
+        self.webcam = WebcamEngine(self)
+        # Keep persisted live evidence and the installed recorded sources.
         self.incidents = [e for e in self.incidents
-                          if e.get("camera") in self.cameras and
-                          e.get("filename") == self.cameras[e["camera"]]["filename"]]
+                          if e.get("source_type") == "webcam" or (e.get("camera") in self.cameras and
+                          e.get("filename") == self.cameras[e["camera"]]["filename"])]
 
     def catalog(self):
+        self.webcam.expire()
         with self.lock:
             return {"cameras": [{k: v for k, v in c.items() if k != "path"}
                                 for c in self.cameras.values()],
@@ -377,7 +381,9 @@ class CameraLibrary:
                 raise ValueError("Weapon model must include both gun/pistol and knife classes; "
                                  f"found {weapon.names}")
             print(f"Weapon classes: {weapon.names}; analyzing at {self.args.analysis_fps:g} FPS", flush=True)
-            for camera in self.cameras.values():
+            for camera in list(self.cameras.values()):
+                if camera.get("source_type") == "webcam":
+                    continue
                 if self.stop.is_set():
                     break
                 if camera["status"] == "error":
@@ -391,7 +397,9 @@ class CameraLibrary:
         except Exception as exc:
             with self.lock:
                 self.model_error = f"{type(exc).__name__}: {exc}"
-                for camera in self.cameras.values():
+                for camera in list(self.cameras.values()):
+                    if camera.get("source_type") == "webcam":
+                        continue
                     if camera["status"] != "error":
                         camera.update(status="error", error=self.model_error)
             print(f"Analysis unavailable: {self.model_error}", flush=True)
@@ -697,7 +705,7 @@ def make_video_handler(library):
                 return self.file(ROOT / "raqeeb.html", "text/html; charset=utf-8")
             if path == "/app.js":
                 return self.file(ROOT / "app.js", "text/javascript; charset=utf-8")
-            if path in ("/ui.css", "/dashboard-ui.js"):
+            if path in ("/ui.css", "/dashboard-ui.js", "/webcam.js"):
                 return self.file(ROOT / path[1:], "text/css; charset=utf-8" if path.endswith(".css") else "text/javascript; charset=utf-8")
             if path in ("/api/cameras", "/api/state"):
                 return self.reply(200, library.catalog())
@@ -718,6 +726,8 @@ def make_video_handler(library):
                 if camera is None:
                     return self.reply(404, {"error": "Unknown camera"})
                 if action == "video":
+                    if camera.get("source_type") == "webcam":
+                        return self.reply(400, {"error": "Live webcams do not have recorded video playback"})
                     return self.file(camera["path"])
                 if action == "thumbnail.jpg":
                     return self.file(library.cache / f"{cid}-thumbnail.jpg", "image/jpeg")
@@ -739,14 +749,26 @@ def make_video_handler(library):
 
         def do_OPTIONS(self):
             return self.reply(204, b"", headers={"Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"})
+                "Access-Control-Allow-Headers": "Content-Type, X-Webcam-Session"})
 
         def do_POST(self):
             try:
                 length = int(self.headers.get("Content-Length", "0"))
+                if self.path == "/api/webcam/frame":
+                    from live_webcam import MAX_FRAME_BYTES
+                    if length <= 0 or length > MAX_FRAME_BYTES:
+                        return self.reply(413, {"error": "Invalid webcam frame size"})
+                    if self.headers.get("Content-Type", "").split(";")[0] != "image/jpeg":
+                        return self.reply(415, {"error": "Webcam frames must be JPEG images"})
+                    return self.reply(200, library.webcam.process(
+                        self.headers.get("X-Webcam-Session"), self.rfile.read(length)))
                 if length <= 0 or length > 16384:
                     return self.reply(400, {"error": "Invalid request size"})
                 data = json.loads(self.rfile.read(length))
+                if self.path == "/api/webcam/start":
+                    return self.reply(200, library.webcam.start())
+                if self.path == "/api/webcam/stop":
+                    return self.reply(200, library.webcam.stop(data.get("session")))
                 if self.path == "/api/incidents":
                     return self.reply(200, library.activate(data["camera"], data["event_id"]))
                 if self.path == "/api/incidents/status":
@@ -761,7 +783,10 @@ def make_video_handler(library):
                     return self.reply(200, incident)
                 return self.reply(404, {"error": "Not found"})
             except (ValueError, KeyError, TypeError) as exc:
-                return self.reply(400, {"error": str(exc)})
+                return self.reply(getattr(exc, "status", 400), {"error": str(exc)})
+            except Exception as exc:
+                print(f"Request failed: {type(exc).__name__}: {exc}", flush=True)
+                return self.reply(503, {"error": "Webcam processing unavailable. Check the server log."})
     return Handler
 
 

@@ -15,7 +15,7 @@ const D = { cameras: [], analyses: new Map(), incidents: [], connected: false,
 let base = (new URLSearchParams(location.search).get("ai") || stored("raqeeb.ai", "") ||
   (location.protocol === "file:" ? "http://localhost:8000" : "")).replace(/\/+$/, "");
 const api = path => `${base}${path}`;
-const NAV = [["live", "Live Monitoring", "البث المباشر", "▶"],
+const NAV = [["webcam", "Live Webcam", "\u0643\u0627\u0645\u064a\u0631\u0627 \u0645\u0628\u0627\u0634\u0631\u0629", ""], ["live", "Live Monitoring", "البث المباشر", "▶"],
   ["overview", "Overview", "نظرة عامة", "◫"], ["alerts", "Security Alerts", "التنبيهات الأمنية", "⚠"],
   ["people", "People Tracking", "تتبع الأشخاص", "☰"], ["cams", "Cameras", "الكاميرات", "◎"],
   ["inc", "Incidents", "الحوادث", "⛨"], ["evid", "Evidence", "الأدلة", "▣"],
@@ -35,7 +35,7 @@ const cameraById = id => D.cameras.find(c => c.id === id);
 
 async function request(path, options={}) {
   const response = await fetch(api(path), {cache:"no-store", ...options, signal: AbortSignal.timeout(15000)});
-  if (!response.ok) throw new Error(`Server returned ${response.status}`);
+  if (!response.ok) { const error=await response.json().catch(()=>({})); throw new Error(error.error || `Server returned ${response.status}`); }
   return response.json();
 }
 function post(path, data) {
@@ -97,7 +97,7 @@ function syncCameraCards() {
   grid.querySelectorAll(".camera-card").forEach(card => {
     if (!cameraById(card.dataset.id)) { card.querySelector("video")?.pause(); card.remove(); }
   });
-  for (const c of D.cameras) {
+  for (const c of D.cameras.filter(c=>c.source_type!=="webcam")) {
     let card = grid.querySelector(`[data-id="${c.id}"]`);
     if (!card) { grid.insertAdjacentHTML("beforeend", cameraCard(c)); card = grid.lastElementChild; }
     card.hidden = !matches(c) || (D.focus && D.focus !== c.id);
@@ -135,7 +135,7 @@ function syncCameraCards() {
       card.querySelector(".camera-poster").hidden = true;
     }
   }
-  $("#readyCount").textContent = D.cameras.filter(c => D.analyses.has(c.id)).length;
+  $("#readyCount").textContent = D.cameras.filter(c => c.source_type!=="webcam" && D.analyses.has(c.id)).length;
   $("#connectionNote").innerHTML = !D.connected ? empty(T("Backend offline. Run <code>.venv\\Scripts\\python.exe server.py</code> and open <a href='http://localhost:8000'>localhost:8000</a>.", "الخادم غير متصل. شغّل server.py وافتح localhost:8000.")) :
     !D.cameras.length ? empty(T("No videos found. Add video files to examples/ or samples/ and restart the server.", "لا توجد مقاطع. أضف المقاطع إلى examples/ أو samples/ وأعد تشغيل الخادم.")) : "";
   paintActivity();
@@ -249,7 +249,7 @@ function showNextAlert() {
   const level=event.severity || "CRITICAL";
   document.body.style.setProperty("--severity-color",severityColor(level));
   document.body.classList.add("lockdown");
-  openM(`<div class="weapon-alert"><div class="alert-kicker">${severityBadge(event.severity)}</div><h1>${esc(event.type)}</h1><p class="mu">${event.camera} · ${esc(event.filename)} · ${T("Footage time", "وقت المقطع")} ${sourceTime(event.time)} · ${Math.round(event.conf*100)}% ${T("confidence", "ثقة")}</p><img class="evidence-image" src="${api(event.snapshot_url)}" alt="${esc(event.type)} evidence"><div class="am"><button class="btn" onclick="acknowledge('${event.id}')">${T("Acknowledge alert", "تأكيد الاطلاع")}</button><button class="btn o" onclick="closeM();focusCamera('${event.camera}',${event.time})">${T("Inspect camera", "فحص الكاميرا")}</button></div></div>`,"critical-modal");
+  openM(`<div class="weapon-alert"><div class="alert-kicker">${severityBadge(event.severity)}</div><h1>${esc(event.type)}</h1><p class="mu">${event.camera} · ${esc(event.filename)} · ${event.source_type==='webcam'?T("Session time", "وقت الجلسة"):T("Footage time", "وقت المقطع")} ${sourceTime(event.time)} · ${Math.round(event.conf*100)}% ${T("confidence", "ثقة")} · ${esc(event.person_id||'')}</p><img class="evidence-image" src="${api(event.snapshot_url)}" alt="${esc(event.type)} evidence"><div class="am"><button class="btn" onclick="acknowledge('${event.id}')">${T("Acknowledge alert", "تأكيد الاطلاع")}</button><button class="btn o" onclick="closeM();focusCamera('${event.camera}',${event.time})">${T("Inspect camera", "فحص الكاميرا")}</button></div></div>`,"critical-modal");
 }
 async function acknowledge(id) {
   await setSt(id,"Under Review"); closeM();
@@ -275,13 +275,14 @@ function incidentRows() {
 function incidentsView() { return uiIncidentsView(); }
 function openAlert(id) {
   const e=D.incidents.find(e => e.id===id); if (!e) return;
-  openM(`<button class="x" onclick="closeM()">×</button><h1>${esc(e.type)}</h1>${severityBadge(e.severity)}<p class="mu">${e.camera} · ${esc(e.filename)} · ${sourceTime(e.time)} · ${Math.round(e.conf*100)}%</p><img class="evidence-image" src="${api(e.snapshot_url)}" alt="Weapon detection evidence"><div class="am"><button class="btn" onclick="closeM();focusCamera('${e.camera}',${e.time})">${T("Review footage", "مراجعة المقطع")}</button><a class="btn o" href="${api(e.snapshot_url)}" download="${e.id}.jpg">${T("Download snapshot", "تحميل الصورة")}</a></div>`);
+  openM(`<button class="x" onclick="closeM()">×</button><h1>${esc(e.type)}</h1>${severityBadge(e.severity)}<p class="mu">${e.camera} · ${esc(e.filename)} · ${sourceTime(e.time)} · ${Math.round(e.conf*100)}%</p><img class="evidence-image" src="${api(e.snapshot_url)}" alt="Weapon detection evidence"><div class="am"><button class="btn" onclick="closeM();focusCamera('${e.camera}',${e.time})">${e.source_type === "webcam" ? T("Open webcam", "\u0641\u062a\u062d \u0627\u0644\u0643\u0627\u0645\u064a\u0631\u0627") : T("Review footage", "مراجعة المقطع")}</button><a class="btn o" href="${api(e.snapshot_url)}" download="${e.id}.jpg">${T("Download snapshot", "تحميل الصورة")}</a></div>`);
 }
 function paintActivity() {
   const element=$("#recentActivity"); if (!element) return;
   element.innerHTML=D.incidents.some(active) ? `<div class="tw"><table><thead><tr><th>${T("Camera", "الكاميرا")}</th><th>${T("Detection", "الكشف")}</th><th>${T("Source time", "وقت المقطع")}</th><th>${T("Confidence", "الثقة")}</th><th>${T("Status", "الحالة")}</th><th></th></tr></thead><tbody>${D.incidents.filter(active).slice(0,8).map(e => `<tr class="incident-row" style="--severity-color:${severityColor(e.severity)}"><td>${e.camera}</td><td><strong>${esc(e.type)}</strong><div>${severityBadge(e.severity)}</div>${e.person_id ? `<div class="mu">${esc(e.person_id)}</div>` : ""}</td><td>${sourceTime(e.time)}</td><td>${Math.round(e.conf*100)}%</td><td>${esc(e.status)}</td><td><button class="btn o" onclick="openAlert('${e.id}')">${T("View evidence", "عرض الأدلة")}</button></td></tr>`).join("")}</tbody></table></div>` : `<p class="mu">${T("No weapon detections observed. Alerts appear here when a gun or knife is detected in the playing footage.", "لا يوجد كشف أسلحة بعد. تظهر التنبيهات عند اكتشاف سلاح في المقطع الجاري.")}</p>`;
 }
 function focusCamera(cid,time) {
+  if(cid === "WEB-01") { go("webcam"); return; }
   D.focus=cid; go("live");
   const card=$(`[data-id="${cid}"]`); if (!card) return;
   card.scrollIntoView({behavior:"smooth",block:"center"});
@@ -296,7 +297,7 @@ function tracks() {
 }
 function openPerson(id) {
   const person=tracks().find(t=>t.class==="person" && t.id===id); if (!person) return;
-  openM(`<div><button class="x" onclick="closeM()" aria-label="Close">&times;</button><h1>${esc(person.id)}</h1><p class="mu">${T("Anonymous person track", "تتبع شخص مجهول")}</p></div><div class="person-profile"><img src="${api(person.snapshot_url)}" alt="${esc(person.id)} screenshot from camera footage"><div class="g"><div class="kv"><div><small>${T("Camera", "الكاميرا")}</small>${person.camera}</div><div><small>${T("Clothing color", "لون الملابس")}</small>${esc(person.color)}</div><div><small>${T("First seen", "أول ظهور")}</small>${sourceTime(person.first_seen)}</div><div><small>${T("Last seen", "آخر ظهور")}</small>${sourceTime(person.last_seen)}</div><div><small>${T("Screenshot time", "وقت اللقطة")}</small>${sourceTime(person.snapshot_time || person.first_seen)}</div></div><div class="am"><button class="btn" onclick="closeM();focusCamera('${person.camera}',${person.snapshot_time || person.first_seen})">${T("View in footage", "عرض في المقطع")}</button><a class="btn o" href="${api(person.snapshot_url)}" download="${person.id}.jpg">${T("Download screenshot", "تنزيل اللقطة")}</a></div></div></div>`);
+  openM(`<div><button class="x" onclick="closeM()" aria-label="Close">&times;</button><h1>${esc(person.id)}</h1><p class="mu">${T("Anonymous person track", "تتبع شخص مجهول")}</p></div><div class="person-profile"><img src="${api(person.snapshot_url)}" alt="${esc(person.id)} screenshot from camera footage"><div class="g"><div class="kv"><div><small>${T("Camera", "الكاميرا")}</small>${person.camera}</div><div><small>${T("Clothing color", "لون الملابس")}</small>${esc(person.color)}</div><div><small>${T("First seen", "أول ظهور")}</small>${sourceTime(person.first_seen)}</div><div><small>${T("Last seen", "آخر ظهور")}</small>${sourceTime(person.last_seen)}</div><div><small>${T("Screenshot time", "وقت اللقطة")}</small>${sourceTime(person.snapshot_time || person.first_seen)}</div></div><div class="am"><button class="btn" onclick="closeM();focusCamera('${person.camera}',${person.snapshot_time || person.first_seen})">${person.source_type === "webcam" ? T("Open webcam", "\u0641\u062a\u062d \u0627\u0644\u0643\u0627\u0645\u064a\u0631\u0627") : T("View in footage", "عرض في المقطع")}</button><a class="btn o" href="${api(person.snapshot_url)}" download="${person.id}.jpg">${T("Download screenshot", "تنزيل اللقطة")}</a></div></div></div>`);
 }
 function peopleView() { return uiPeopleView(); }
 function overviewView() { return uiDashboard(); }
@@ -316,16 +317,18 @@ function render() {
     state.savedTime=video.currentTime; D.frames.set(video.dataset.camera,state); video.pause();
   });
   $("#nl").innerHTML=uiNavigation();
-  const views={live:liveView,overview:overviewView,alerts:incidentsView,inc:incidentsView,people:peopleView,cams:camerasView,evid:evidenceView,health:healthView,ana:analyticsView,set:settingsView};
+  const views={webcam:uiWebcamView,live:liveView,overview:overviewView,alerts:incidentsView,inc:incidentsView,people:peopleView,cams:camerasView,evid:evidenceView,health:healthView,ana:analyticsView,set:settingsView};
   $("#main").innerHTML=(views[D.view] || liveView)()+`<footer class="view-footer"><span>RAQEEB &nbsp; / &nbsp; ${T("SECURITY OPERATIONS", "عمليات الأمن")}</span><span>${T("Recorded sources · Local analysis", "مصادر مسجلة · تحليل محلي")}</span></footer>`;
   if (D.view==="live") { if (D.focus) $(".page-actions").insertAdjacentHTML("afterbegin",`<button class="btn o" onclick="D.focus='';render()">${T("Show all cameras", "عرض كل الكاميرات")}</button>`); syncCameraCards(); }
+  if (D.view === "webcam") webcamMount();
   paintActivity(); updateChrome();
 }
 function updateChrome() {
-  const ready=D.cameras.filter(c=>c.status==="ready").length;
+  const ready=D.cameras.filter(c=>["ready","live"].includes(c.status)).length;
+  const processing=D.cameras.some(c=>["queued","analyzing","starting"].includes(c.status));
   $("#modeLabel").textContent=T("RECORDED CAMERAS", "كاميرات مسجلة");
   $("#aic").textContent=!D.connected ? T("AI: offline", "الذكاء الاصطناعي: غير متصل") : `${T("AI ready", "جاهز")}: ${ready}/${D.cameras.length}`;
-  $("#aist").textContent=!D.connected ? "OFFLINE" : D.error ? "ERROR" : ready===D.cameras.length && ready ? "READY" : "ANALYZING";
+  $("#aist").textContent=!D.connected ? "OFFLINE" : D.error ? "ERROR" : !processing && ready ? "READY" : "ANALYZING";
   $("#aist").style.color=D.error ? "var(--rd)" : "var(--cy)";
   $("#sysOnlineText").textContent=D.connected ? T("SYSTEM CONNECTED", "النظام متصل") : T("BACKEND OFFLINE", "الخادم غير متصل");
   $("#sysCamsText").textContent=`${T("Camera sources", "مصادر الكاميرات")}: ${D.cameras.length} · ${ready} ${T("ready", "جاهزة")}`;
@@ -335,7 +338,9 @@ function updateChrome() {
   uiUpdateChrome();
 }
 async function loadAnalysis(c) {
-  if (D.analyses.get(c.id)?.fingerprint === c.analysis_revision || D.loading.has(c.id)) return;
+  if (D.loading.has(c.id)) return;
+  if (c.source_type === "webcam" && W.active && D.analyses.has(c.id)) return;
+  if (c.source_type !== "webcam" && D.analyses.get(c.id)?.fingerprint === c.analysis_revision) return;
   D.loading.add(c.id);
   try { const a=await request(c.analysis_url); if (a.frames) { D.analyses.set(c.id,a); D.frames.delete(c.id); } }
   catch { /* Catalog polling retries when the backend is available. */ }
@@ -349,7 +354,7 @@ async function poll() {
     D.connected=true; D.cameras=catalog.cameras; D.capabilities=catalog.capabilities;
     for (const id of D.analyses.keys()) if (!cameraById(id)) { D.analyses.delete(id); D.frames.delete(id); }
     D.error=catalog.model_error || ""; D.incidents=catalog.incidents;
-    await Promise.all(D.cameras.filter(c=>c.status==="ready").map(loadAnalysis));
+    await Promise.all(D.cameras.filter(c=>c.status==="ready" || c.source_type==="webcam").map(loadAnalysis));
     if (D.view==="live") syncCameraCards();
     else if (changed && !D.query) render();
     updateChrome(); document.querySelectorAll(".sy").forEach(e=>e.textContent=new Date().toLocaleTimeString());

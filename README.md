@@ -101,3 +101,34 @@ The console uses grouped navigation, a centered search field, consistent line ic
 Overview and Analytics show real person-track distribution, camera readiness, observed incident severity, per-camera incident counts, and sampled person counts over source time. Charts never invent activity for unobserved footage. People Tracking includes a paginated snapshot directory; alerts and incident history retain their existing review and evidence behavior. Camera playback, AI inference, tracking, IDs, weapon confirmation, and incident persistence are unchanged by this redesign.
 
 The browser check captures each screen and verifies chart totals, all-screen mobile layout, Arabic mobile layout, and the existing camera/alert workflow. UI styling is in `ui.css`; reusable presentation components are in `dashboard-ui.js`.
+
+## Live Webcam
+
+Open **Live Webcam** in the sidebar, choose a camera, and click **Start webcam**. Allow the browser's camera permission prompt. The microphone is never requested. Use **Stop webcam** to release the device; closing the page also releases it. Browser camera access requires `localhost` or HTTPS. Recorded CAM-01 and CAM-03 remain available in Live Monitoring.
+
+The browser sends one current JPEG frame at a time to the local backend. The same person/weapon/pose models and hand-validation rules used for recorded cameras run on those frames. Guns need two observations of the same tracked holder; knives need three with the existing higher confidence floor. The live confirmation window allows CPU processing intervals, and a continuous appearance produces one incident. Different holders confirm separately. Inference is not the native preview frame rate: this CPU processed the test input at approximately 1?2 analyzed frames per second.
+
+The **Live preview** shows unprocessed camera video. The **AI detection view** displays the exact analyzed frame with synchronized boxes, measured inference rate, and frame age. The next frame is captured after the current request completes, so frames do not build up in a queue. Live recognition continues when navigating to another dashboard screen until Stop is pressed.
+
+WEB-01 uses global anonymous person IDs independent of camera numbering. Its tracks, screenshots, confirmed gun/knife incidents, evidence, and review status appear in the existing People Tracking, Alerts, Incidents, and Evidence pages. Snapshots and track/incident metadata persist under `runtime/`. A new webcam session receives new anonymous track IDs; this does not verify identity across sessions. Continuous webcam video is **not** recorded, so historical live alerts can be reviewed through snapshots, not video replay.
+
+Files: `live_webcam.py` owns token-scoped sessions and inference; `webcam.js` owns explicit video-only browser capture and the live UI. Only one webcam tab owns the active session. In-flight results are rejected after Stop, and inactive sessions expire after 30 seconds without frames.
+
+### Webcam regression checks
+
+```powershell
+.venv\Scripts\python.exe -m unittest discover -s tests -v
+.venv\Scripts\python.exe tests/make_webcam_fixture.py
+.venv\Scripts\python.exe server.py --port 8002 --runtime-dir runtime/webcam-validation
+```
+
+In another terminal:
+
+```powershell
+$env:WEBCAM_TEST_VIDEO=(Resolve-Path runtime/webcam-test.y4m).Path
+node tests/browser_webcam.mjs
+```
+
+The fixture is generated from the supplied video solely for the browser test. The test explicitly starts Chrome with its test camera flags; the production app has no simulated webcam or fallback feed. It verifies browser capture, actual gun-model inference, alert/evidence creation, person snapshots, cross-screen monitoring, camera release on Stop, permission-denied handling, and mobile/RTL layout. Knife confirmation is covered by unit tests; a physical webcam and a real knife scenario have not been validated in this environment.
+
+Implementation references: [browser camera access](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia), [releasing camera tracks](https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack/stop), and [persistent frame-by-frame tracking](https://docs.ultralytics.com/modes/track/).
