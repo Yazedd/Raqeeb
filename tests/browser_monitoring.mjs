@@ -58,6 +58,14 @@ try {
   await evaluate('closeM()');
   for(const view of ['overview','alerts','people','cams','inc','evid','ana','health','set','live']) {
     await evaluate(`go('${view}')`); assert(await evaluate('document.querySelector("#main").innerText.length>20'));
+    assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false,view+' desktop overflow');
+    await evaluate('document.fonts.ready'); await sleep(120);
+    const viewShot=await cdp('Page.captureScreenshot',{format:'png'});
+    await writeFile(join(out,`raqeeb-${view}-desktop.png`),Buffer.from(viewShot.data,'base64'));
+    if(view==='overview') {
+      assert.equal(await evaluate('document.querySelectorAll(".donut-wrap").length'),3);
+      assert.equal(await evaluate('Number(document.querySelector(".donut-value b").textContent)'),people.length);
+    }
   }
   await until('document.querySelectorAll("video[data-camera]").length===2 && [...document.querySelectorAll("video")].every(v=>v.readyState>=2)');
   await evaluate('toggleMonitoring()'); await sleep(1200);
@@ -94,10 +102,28 @@ try {
   await evaluate('toggleChat()');
   await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
   await sleep(300);
+  for(const view of ['overview','people','alerts','cams','evid','ana','health','set','live']) {
+    await evaluate(`go('${view}')`); await sleep(70);
+    assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false,view+' mobile overflow');
+    if(['overview','people'].includes(view)) {
+      const shot=await cdp('Page.captureScreenshot',{format:'png'});
+      await writeFile(join(out,`raqeeb-${view}-mobile.png`),Buffer.from(shot.data,'base64'));
+    }
+  }
   const overflow=await evaluate('document.documentElement.scrollWidth>innerWidth');
   assert.equal(overflow,false,'Mobile view must not overflow horizontally');
   const mobile=await cdp('Page.captureScreenshot',{format:'png'});
   await writeFile(join(out,'raqeeb-monitoring-mobile.png'),Buffer.from(mobile.data,'base64'));
+  await evaluate('toggleLang()');
+  for(const view of ['overview','live','people','alerts','health','set']) {
+    await evaluate(`go('${view}')`);
+    assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false,view+' Arabic mobile overflow');
+  }
+  await evaluate("toggleLang(); go('overview'); toggleTheme()");
+  await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+  const light=await cdp('Page.captureScreenshot',{format:'png'});
+  await writeFile(join(out,'raqeeb-overview-light.png'),Buffer.from(light.data,'base64'));
+  await evaluate('toggleTheme()');
   assert.equal(errors.length,0,JSON.stringify(errors));
   console.log('Passed navigation, playback, real alert/evidence/persistence, restart, RTL, theme, person search, mobile layout, and runtime error checks.');
   await cdp('Browser.close');

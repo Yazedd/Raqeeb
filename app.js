@@ -50,15 +50,15 @@ function toast(message, severity="INFO") {
 function applyTheme(theme) {
   currentTheme = theme; save("raqeeb_theme", theme);
   document.documentElement.dataset.theme = theme;
-  $("#themeToggle").textContent = theme === "dark" ? T("☀ Light", "☀ الفاتح") : T("☾ Dark", "☾ الداكن");
+  $("#themeToggle").innerHTML = uiIcon("sun",13)+(theme === "dark" ? T("Light", "\u0627\u0644\u0641\u0627\u062a\u062d") : T("Dark", "\u0627\u0644\u062f\u0627\u0643\u0646"));
 }
 function toggleTheme() { applyTheme(currentTheme === "dark" ? "light" : "dark"); }
 function applyLang(lang) {
   currentLang = lang; save("raqeeb_lang", lang);
   document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
-  $("#langToggle").textContent = T("🌐 العربية", "🌐 English");
+  $("#langToggle").textContent = T("\u0627\u0644\u0639\u0631\u0628\u064a\u0629", "English");
   $("#q").placeholder = T("Search cameras, people, or weapon alerts…", "ابحث عن كاميرا أو شخص أو تنبيه سلاح…");
-  $("#chatLaunchBtn").textContent = T("◌ Person Search", "◌ بحث عن شخص");
+  $("#chatLaunchBtn").textContent = T("Person Search", "\u0628\u062d\u062b \u0639\u0646 \u0634\u062e\u0635");
   $("#chatTitle").textContent = T("Person Search", "بحث عن شخص");
   $("#chatSub").textContent = T("Search AI tracks from your camera footage", "البحث في تتبع الأشخاص من مقاطع الكاميرات");
   $("#chatWelcome").textContent = T("Search by clothing color, camera, or track ID. Results come from analyzed footage.", "ابحث بلون الملابس أو الكاميرا أو معرف التتبع. النتائج من المقاطع المحللة.");
@@ -83,26 +83,14 @@ function sq(value) {
     document.querySelectorAll(".camera-card").forEach(el => el.hidden = !matches(cameraById(el.dataset.id)));
   } else render();
 }
-function pageHead(title, subtitle, actions="") {
-  return `<section class="page-head reference-heading"><div><h1>${title}</h1><div class="mu">${subtitle}</div></div><div class="page-actions">${actions}</div></section>`;
-}
+function pageHead(title, subtitle, actions="") { return uiHead(title, subtitle, actions); }
 function empty(text) { return `<div class="card empty-state">${text}</div>`; }
 function stat(label, value, detail="") { return `<div class="card"><span class="mu">${label}</span><b class="big">${value}</b><small class="mu">${detail}</small></div>`; }
 function playbackButtons() {
   return `<button class="btn" id="monitorButton" onclick="toggleMonitoring()">${D.running ? T("Ⅱ Pause all", "Ⅱ إيقاف الكل") : T("▶ Start monitoring", "▶ بدء المراقبة")}</button><button class="btn o" onclick="restartMonitoring()">${T("↻ Restart footage", "↻ إعادة المقاطع")}</button><button class="btn o" id="soundButton" onclick="toggleSound()">${D.muted ? T("Sound off", "الصوت معطل") : T("Sound on", "الصوت مفعل")}</button>`;
 }
-function liveView() {
-  return pageHead(T("Live Monitoring", "البث المباشر"), T("Recorded camera sources · AI detections synchronized to video playback", "مصادر كاميرات مسجلة · الكشف متزامن مع تشغيل الفيديو"), playbackButtons()) +
-    `<div class="monitor-summary"><span><i class="status-dot"></i><b id="readyCount">0</b> ${T("cameras ready", "كاميرات جاهزة")}</span><span>YOLO26 + Weapon AI</span><span>${T("Gun & knife detection", "كشف المسدسات والسكاكين")}</span><span id="monitorState">${D.running ? T("Monitoring", "قيد المراقبة") : T("Press Start monitoring to begin", "اضغط بدء المراقبة")}</span></div>
-    <div id="cameraGrid" class="camera-grid"></div><div id="connectionNote"></div>
-    <section class="card"><div class="section-head"><h2>${T("Detection activity", "نشاط الكشف")}</h2><span class="mu">${T("From the footage on screen", "من المقاطع المعروضة")}</span></div><div id="recentActivity"></div></section>`;
-}
-function cameraCard(c) {
-  return `<article class="card camera-card" data-id="${c.id}"><div class="section-head"><div class="am"><b>${c.id}</b><span class="camera-name">${esc(c.name)}</span></div><span class="camera-status b"></span></div>
-    <div class="camera-stage" id="stage-${c.id}" style="aspect-ratio:${c.width || 16}/${c.height || 9}"><img class="camera-poster" src="${api(c.thumbnail_url)}" alt="${esc(c.filename)}"><div class="camera-overlay"></div><div class="camera-wait"></div><span class="camera-source">${T("RECORDED SOURCE", "مصدر مسجل")}</span><span class="camera-clock">00:00 / ${sourceTime(c.duration)}</span></div>
-    <div class="camera-footer"><span class="mu">${esc(c.filename)} · ${c.width}×${c.height}</span><span class="camera-detections">${T("Waiting for AI", "بانتظار التحليل")}</span></div>
-    <div class="camera-actions"><button class="btn o" onclick="focusCamera('${c.id}')">${T("Inspect camera", "فحص الكاميرا")}</button><button class="btn o" onclick="fullscreenCamera('${c.id}')">${T("Full screen", "ملء الشاشة")}</button><a class="btn o" href="${api(`/api/cameras/${c.id}/detections.csv`)}">${T("Export detections", "تصدير الكشف")}</a></div></article>`;
-}
+function liveView() { return uiLiveView(); }
+function cameraCard(c) { return uiCameraCard(c); }
 function syncCameraCards() {
   if (D.view !== "live") return;
   const grid = $("#cameraGrid");
@@ -179,9 +167,9 @@ function restartMonitoring() {
 }
 function updatePlaybackChrome() {
   const button = $("#monitorButton");
-  if (button) button.textContent = D.running ? T("Ⅱ Pause all", "Ⅱ إيقاف الكل") : T("▶ Start monitoring", "▶ بدء المراقبة");
+  if (button) button.innerHTML = uiIcon(D.running?"pause":"play",14)+(D.running ? T("Pause all", "\u0625\u064a\u0642\u0627\u0641 \u0627\u0644\u0643\u0644") : T("Start monitoring", "\u0628\u062f\u0621 \u0627\u0644\u0645\u0631\u0627\u0642\u0628\u0629"));
   if ($("#monitorState")) $("#monitorState").textContent = D.running ? T("Monitoring recorded sources", "مراقبة المصادر المسجلة") : T("Playback paused", "التشغيل متوقف");
-  if ($("#soundButton")) $("#soundButton").textContent = D.muted ? T("Sound off", "الصوت معطل") : T("Sound on", "الصوت مفعل");
+  if ($("#soundButton")) $("#soundButton").innerHTML = uiIcon("sound",14)+(D.muted ? T("Sound off", "\u0627\u0644\u0635\u0648\u062a \u0645\u0639\u0637\u0644") : T("Sound on", "\u0627\u0644\u0635\u0648\u062a \u0645\u0641\u0639\u0644"));
 }
 function sampleAt(analysis, time) {
   const frames = analysis.frames; let lo=0, hi=frames.length-1, index=-1;
@@ -284,10 +272,7 @@ function incidentRows() {
   const statuses=["New","Under Review","Investigating","Confirmed","False Positive","Resolved"];
   return D.incidents.filter(e => D.view === "inc" || active(e)).filter(matches).map(e => `<tr class="incident-row" style="--severity-color:${severityColor(e.severity)}"><td>${esc(e.detected_at.replace("T"," "))}</td><td>${e.camera}</td><td><strong>${esc(e.type)}</strong><div>${severityBadge(e.severity)}</div>${e.person_id ? `<div class="mu">${esc(e.person_id)}</div>` : ""}</td><td>${sourceTime(e.time)}</td><td>${Math.round(e.conf*100)}%</td><td><select aria-label="Incident status" onchange="setSt('${e.id}',this.value)">${statuses.map(s => `<option${s===e.status ? " selected" : ""}>${s}</option>`).join("")}</select></td><td><button class="btn o" onclick="openAlert('${e.id}')">${T("Evidence", "الأدلة")}</button></td></tr>`).join("");
 }
-function incidentsView() {
-  return pageHead(T("Security incidents", "الحوادث الأمنية"),T("Model detections observed during camera playback. Status changes are saved.", "كشف النموذج أثناء تشغيل المقاطع. يتم حفظ تغييرات الحالة."))+
-    (D.incidents.some(e => D.view === "inc" || active(e)) ? `<div class="card tw"><table><thead><tr><th>${T("Detected at", "وقت الكشف")}</th><th>${T("Camera", "الكاميرا")}</th><th>${T("Event", "الحدث")}</th><th>${T("Source time", "وقت المقطع")}</th><th>${T("Confidence", "الثقة")}</th><th>${T("Status", "الحالة")}</th><th></th></tr></thead><tbody>${incidentRows()}</tbody></table></div>` : empty(T("No weapon alerts observed yet. Start camera playback in Live Monitoring.", "لا توجد تنبيهات أسلحة بعد. ابدأ تشغيل الكاميرات.")));
-}
+function incidentsView() { return uiIncidentsView(); }
 function openAlert(id) {
   const e=D.incidents.find(e => e.id===id); if (!e) return;
   openM(`<button class="x" onclick="closeM()">×</button><h1>${esc(e.type)}</h1>${severityBadge(e.severity)}<p class="mu">${e.camera} · ${esc(e.filename)} · ${sourceTime(e.time)} · ${Math.round(e.conf*100)}%</p><img class="evidence-image" src="${api(e.snapshot_url)}" alt="Weapon detection evidence"><div class="am"><button class="btn" onclick="closeM();focusCamera('${e.camera}',${e.time})">${T("Review footage", "مراجعة المقطع")}</button><a class="btn o" href="${api(e.snapshot_url)}" download="${e.id}.jpg">${T("Download snapshot", "تحميل الصورة")}</a></div>`);
@@ -313,37 +298,13 @@ function openPerson(id) {
   const person=tracks().find(t=>t.class==="person" && t.id===id); if (!person) return;
   openM(`<div><button class="x" onclick="closeM()" aria-label="Close">&times;</button><h1>${esc(person.id)}</h1><p class="mu">${T("Anonymous person track", "تتبع شخص مجهول")}</p></div><div class="person-profile"><img src="${api(person.snapshot_url)}" alt="${esc(person.id)} screenshot from camera footage"><div class="g"><div class="kv"><div><small>${T("Camera", "الكاميرا")}</small>${person.camera}</div><div><small>${T("Clothing color", "لون الملابس")}</small>${esc(person.color)}</div><div><small>${T("First seen", "أول ظهور")}</small>${sourceTime(person.first_seen)}</div><div><small>${T("Last seen", "آخر ظهور")}</small>${sourceTime(person.last_seen)}</div><div><small>${T("Screenshot time", "وقت اللقطة")}</small>${sourceTime(person.snapshot_time || person.first_seen)}</div></div><div class="am"><button class="btn" onclick="closeM();focusCamera('${person.camera}',${person.snapshot_time || person.first_seen})">${T("View in footage", "عرض في المقطع")}</button><a class="btn o" href="${api(person.snapshot_url)}" download="${person.id}.jpg">${T("Download screenshot", "تنزيل اللقطة")}</a></div></div></div>`);
 }
-function peopleView() {
-  const people=tracks().filter(t=>t.class==="person" && matches(t));
-  return pageHead(T("People Tracking", "تتبع الأشخاص"),T("Stable person IDs and actual screenshots from camera footage.", "معرفات ثابتة ولقطات فعلية من الكاميرات."))+
-    (people.length ? `<div class="card tw"><table class="people-table"><thead><tr><th>${T("Screenshot", "لقطة")}</th><th>${T("Person ID", "معرف الشخص")}</th><th>${T("Camera", "الكاميرا")}</th><th>${T("Clothing color", "لون الملابس")}</th><th>${T("First seen", "أول ظهور")}</th><th>${T("Last seen", "آخر ظهور")}</th><th>${T("Confidence", "الثقة")}</th><th></th></tr></thead><tbody>${people.map(t=>`<tr><td><button class="person-thumbnail" onclick="openPerson('${t.id}')" aria-label="${T("View screenshot for", "\u0639\u0631\u0636 \u0644\u0642\u0637\u0629")} ${t.id}"><img src="${api(t.snapshot_url)}" loading="lazy" alt="${esc(t.id)}"></button></td><td><button class="person-id-button" onclick="openPerson('${t.id}')">${t.track}</button></td><td>${t.camera}</td><td>${esc(t.color)}</td><td>${sourceTime(t.first_seen)}</td><td>${sourceTime(t.last_seen)}</td><td>${Math.round(t.conf*100)}%</td><td><button class="btn o" onclick="focusCamera('${t.camera}',${t.first_seen})">${T("View footage", "\u0639\u0631\u0636 \u0627\u0644\u0645\u0642\u0637\u0639")}</button></td></tr>`).join("")}</tbody></table></div>` : empty(T("No matching person tracks available yet.", "\u0644\u0627 \u064a\u0648\u062c\u062f \u062a\u062a\u0628\u0639 \u0645\u0637\u0627\u0628\u0642 \u062d\u062a\u0649 \u0627\u0644\u0622\u0646.")));
-}
-function overviewView() {
-  const people=tracks().filter(t=>t.class==="person"), ready=D.cameras.filter(c=>c.status==="ready").length;
-  return pageHead(T("Security overview", "نظرة عامة على الأمن"),T("Measurements from your recorded camera sources", "قياسات من مصادر الكاميرات المسجلة"),`<button class="btn" onclick="go('live')">${T("Open monitoring", "فتح المراقبة")}</button>`)+
-    `<div class="g st">${stat(T("Cameras", "الكاميرات"),D.cameras.length,`${ready} ${T("AI ready", "جاهزة")}`)}${stat(T("Person tracks", "تتبع الأشخاص"),people.length,T("Across analyzed footage", "عبر المقاطع المحللة"))}${stat(T("Open incidents", "حوادث مفتوحة"),D.incidents.filter(active).length)}${stat(T("Weapon alerts", "تنبيهات الأسلحة"),D.incidents.filter(e=>e.status!=="False Positive").length)}</div><section class="card"><h2>${T("Recent incidents", "أحدث الحوادث")}</h2><div id="recentActivity"></div></section>`;
-}
-function camerasView() {
-  return pageHead(T("Cameras", "الكاميرات"),T("Only video sources discovered in examples/ and samples/", "مصادر الفيديو الموجودة في examples/ و samples/ فقط"))+
-    `<div class="g cams">${D.cameras.filter(matches).map(c=>`<div class="card"><img class="catalog-thumbnail" src="${api(c.thumbnail_url)}" alt="${esc(c.name)}"><h2>${c.id} · ${esc(c.name)}</h2><p class="mu">${esc(c.filename)} · ${sourceTime(c.duration)} · ${c.width}×${c.height}</p><div class="am">${badge(c.status)}<button class="btn o" onclick="focusCamera('${c.id}')">${T("Open camera", "فتح الكاميرا")}</button></div></div>`).join("") || empty(T("No cameras discovered yet.", "لا توجد كاميرات بعد."))}</div>`;
-}
-function evidenceView() {
-  return pageHead(T("Detection evidence", "أدلة الكشف"),T("Actual source frames captured by the weapon detector", "إطارات فعلية التقطها كاشف الأسلحة"))+
-    `<div class="g cams">${D.incidents.filter(e=>e.status!=="False Positive").filter(matches).map(e=>`<div class="card"><img class="catalog-thumbnail" src="${api(e.snapshot_url)}" alt="${esc(e.type)}"><h2>${esc(e.type)}</h2><p class="mu">${e.camera} · ${sourceTime(e.time)} · ${Math.round(e.conf*100)}%</p><button class="btn o" onclick="openAlert('${e.id}')">${T("Review evidence", "مراجعة الأدلة")}</button></div>`).join("") || empty(T("Evidence is captured when weapon alerts occur.", "تظهر الأدلة عند حدوث تنبيهات الأسلحة."))}</div>`;
-}
-function healthView() {
-  return pageHead(T("Analysis status", "حالة التحليل"),T("Actual processing status. No predicted failures or simulated network events.", "حالة المعالجة الفعلية."))+
-    `<div class="g st">${stat(T("Backend", "الخادم"),D.connected ? T("Connected", "متصل") : T("Offline", "غير متصل"))}${stat(T("Weapon classes", "فئات الأسلحة"),D.capabilities.map(esc).join(" + ") || "—")}</div><div class="card tw"><table><thead><tr><th>Camera</th><th>File</th><th>Status</th><th>Progress</th><th>Samples</th><th>Details</th></tr></thead><tbody>${D.cameras.map(c=>`<tr><td>${c.id}</td><td>${esc(c.filename)}</td><td>${esc(c.status)}</td><td>${c.progress}%</td><td>${c.samples}</td><td>${esc(c.error || "OK")}</td></tr>`).join("")}</tbody></table></div>`;
-}
-function analyticsView() {
-  const persons=tracks().filter(t=>t.class==="person");
-  return pageHead(T("Security Analytics", "التحليلات الأمنية"),T("Counts from analyzed footage and observed alerts", "إحصاءات المقاطع المحللة والتنبيهات المرصودة"))+
-    `<div class="g st">${stat(T("Gun alerts", "تنبيهات المسدسات"),D.incidents.filter(e=>e.status!=="False Positive" && e.class==="gun").length)}${stat(T("Knife alerts", "تنبيهات السكاكين"),D.incidents.filter(e=>e.status!=="False Positive" && e.class==="knife").length)}${stat(T("Person tracks", "تتبع الأشخاص"),persons.length)}${stat(T("Analyzed samples", "الإطارات المحللة"),D.cameras.reduce((n,c)=>n+c.samples,0))}</div>`;
-}
-function settingsView() {
-  return pageHead(T("Settings", "الإعدادات"),T("Recorded camera monitoring", "مراقبة الكاميرات المسجلة"))+
-    `<div class="card g"><label class="am">${T("Backend URL", "رابط الخادم")}<input class="settings-input" value="${esc(base)}" placeholder="http://localhost:8000" onchange="aiSetUrl(this.value)"></label><p class="mu">${T("Videos are analyzed locally with YOLO26 and the Pistol/Knife model. Playback and detection overlays share source timestamps. Add videos to examples/ or samples/ and restart the server to discover them.", "تُحلل المقاطع محلياً باستخدام YOLO26 ونموذج المسدسات والسكاكين. أضف مقاطع إلى examples/ أو samples/ ثم أعد تشغيل الخادم.")}</p><p class="mu">${T("Clothing colors are approximate. Detection confidence is a model score, and model detections can be missed or incorrect.", "ألوان الملابس تقريبية. ثقة الكشف درجة من النموذج وقد يخطئ النموذج أو يفوت بعض الأجسام.")}</p></div>`;
-}
+function peopleView() { return uiPeopleView(); }
+function overviewView() { return uiDashboard(); }
+function camerasView() { return uiCamerasView(); }
+function evidenceView() { return uiEvidenceView(); }
+function healthView() { return uiHealthView(); }
+function analyticsView() { return uiDashboard(true); }
+function settingsView() { return uiSettingsView(); }
 function aiSetUrl(value) {
   try { if (value.trim()) { const url=new URL(value.trim()); if (!["http:","https:"].includes(url.protocol)) throw new Error(); } }
   catch { return toast(T("Enter an HTTP or HTTPS URL", "أدخل رابط HTTP أو HTTPS")); }
@@ -354,9 +315,9 @@ function render() {
     const state=D.frames.get(video.dataset.camera) || {};
     state.savedTime=video.currentTime; D.frames.set(video.dataset.camera,state); video.pause();
   });
-  $("#nl").innerHTML=NAV.map(([id,en,ar,icon])=>`<a class="${D.view===id ? "on" : ""}" onclick="go('${id}')" title="${T(en,ar)}"><b>${icon}</b><span>${T(en,ar)}</span></a>`).join("");
+  $("#nl").innerHTML=uiNavigation();
   const views={live:liveView,overview:overviewView,alerts:incidentsView,inc:incidentsView,people:peopleView,cams:camerasView,evid:evidenceView,health:healthView,ana:analyticsView,set:settingsView};
-  $("#main").innerHTML=(views[D.view] || liveView)();
+  $("#main").innerHTML=(views[D.view] || liveView)()+`<footer class="view-footer"><span>RAQEEB &nbsp; / &nbsp; ${T("SECURITY OPERATIONS", "عمليات الأمن")}</span><span>${T("Recorded sources · Local analysis", "مصادر مسجلة · تحليل محلي")}</span></footer>`;
   if (D.view==="live") { if (D.focus) $(".page-actions").insertAdjacentHTML("afterbegin",`<button class="btn o" onclick="D.focus='';render()">${T("Show all cameras", "عرض كل الكاميرات")}</button>`); syncCameraCards(); }
   paintActivity(); updateChrome();
 }
@@ -371,6 +332,7 @@ function updateChrome() {
   $("#sysDateLabel").textContent=new Date().toLocaleDateString(currentLang==="ar" ? "ar-SA" : "en-GB");
   $("#bc").textContent=D.unread;
   $("#bc").classList.toggle("has-unread",D.unread>0);
+  uiUpdateChrome();
 }
 async function loadAnalysis(c) {
   if (D.analyses.get(c.id)?.fingerprint === c.analysis_revision || D.loading.has(c.id)) return;

@@ -57,7 +57,9 @@ Changing the models, source files, tracker, analysis resolution, sample rate, or
 
 | File | Purpose |
 | --- | --- |
-| `raqeeb.html` | Dashboard structure and responsive dark/light styling |
+| `raqeeb.html` | Accessible dashboard shell and centered search |
+| `ui.css` | Shared responsive dark/light design system |
+| `dashboard-ui.js` | Navigation, metrics, charts, directories, and review layouts |
 | `app.js` | Camera playback, synchronized boxes/alerts, search, and incident review |
 | `server.py` | Server command-line entry point |
 | `video_cameras.py` | Video discovery, YOLO analysis, evidence, HTTP range streaming, and persistence |
@@ -91,3 +93,11 @@ node tests/browser_monitoring.mjs
 ```
 
 The browser check covers decoded playback, person screenshots, unique track rows, both CAM-03 gun holders, critical alerts and evidence, acknowledgement, replay deduplication, navigation, RTL, themes, search, and mobile overflow. Screenshots are saved in the system temporary directory under `raqeeb-browser-qa`. `CHROME_PATH`, `RAQEEB_QA_URL`, and `RAQEEB_QA_OUTPUT` can override the defaults.
+
+## Professional dashboard UI
+
+The console uses grouped navigation, a centered search field, consistent line icons, soft panel corners, and a dark palette inspired by the supplied dashboard reference. Every screen also supports a light theme and Arabic RTL layout.
+
+Overview and Analytics show real person-track distribution, camera readiness, observed incident severity, per-camera incident counts, and sampled person counts over source time. Charts never invent activity for unobserved footage. People Tracking includes a paginated snapshot directory; alerts and incident history retain their existing review and evidence behavior. Camera playback, AI inference, tracking, IDs, weapon confirmation, and incident persistence are unchanged by this redesign.
+
+The browser check captures each screen and verifies chart totals, all-screen mobile layout, Arabic mobile layout, and the existing camera/alert workflow. UI styling is in `ui.css`; reusable presentation components are in `dashboard-ui.js`.

@@ -697,6 +697,8 @@ def make_video_handler(library):
                 return self.file(ROOT / "raqeeb.html", "text/html; charset=utf-8")
             if path == "/app.js":
                 return self.file(ROOT / "app.js", "text/javascript; charset=utf-8")
+            if path in ("/ui.css", "/dashboard-ui.js"):
+                return self.file(ROOT / path[1:], "text/css; charset=utf-8" if path.endswith(".css") else "text/javascript; charset=utf-8")
             if path in ("/api/cameras", "/api/state"):
                 return self.reply(200, library.catalog())
             if path == "/api/incidents":
