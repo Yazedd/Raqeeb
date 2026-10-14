@@ -44,6 +44,11 @@ try {
   await evaluate('startWebcam()');
   await until('W.active && W.last && W.last.samples>=2',90000);
   assert.equal(await evaluate('W.stream.getAudioTracks().length'),0);
+  if(await evaluate('!!window.SiteMap3D')) {
+    await until('SiteMap3D.scene');
+    await evaluate("SiteMap3D.bindSource('WEB-01','CAM-06')");
+    await until('SiteMap3D.tracking.people.some(p=>p.camera==="WEB-01")');
+  }
   assert(await evaluate('W.last.inference_ms>0 && W.last.inference_fps>0'));
   await until('document.querySelector("#webcamResult").naturalWidth>0');
   if(process.env.WEBCAM_TEST_VIDEO) {

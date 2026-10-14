@@ -225,7 +225,7 @@ function paintVideo(video, mediaTime=video.currentTime) {
       }
     }
   }
-  state.time=time; state.savedTime=time; state.dets=frame?.dets || [];
+  state.observedAt=Date.now(); state.time=time; state.savedTime=time; state.dets=frame?.dets || [];
   D.frames.set(cid,state);
 }
 async function activateEvent(event) {
@@ -321,6 +321,8 @@ function render() {
   $("#main").innerHTML=(views[D.view] || liveView)()+`<footer class="view-footer"><span>RAQEEB &nbsp; / &nbsp; ${T("SECURITY OPERATIONS", "عمليات الأمن")}</span><span>${T("Recorded sources · Local analysis", "مصادر مسجلة · تحليل محلي")}</span></footer>`;
   if (D.view==="live") { if (D.focus) $(".page-actions").insertAdjacentHTML("afterbegin",`<button class="btn o" onclick="D.focus='';render()">${T("Show all cameras", "عرض كل الكاميرات")}</button>`); syncCameraCards(); }
   if (D.view === "webcam") webcamMount();
+  const mapHost=$("#main").querySelector('[data-role="site-map"]');
+  if(window.SiteMap3D) { mapHost ? SiteMap3D.mount(mapHost) : SiteMap3D.unmount(); }
   paintActivity(); updateChrome();
 }
 function updateChrome() {
@@ -336,13 +338,14 @@ function updateChrome() {
   $("#bc").textContent=D.unread;
   $("#bc").classList.toggle("has-unread",D.unread>0);
   uiUpdateChrome();
+  window.SiteMap3D?.refresh();
 }
 async function loadAnalysis(c) {
   if (D.loading.has(c.id)) return;
   if (c.source_type === "webcam" && W.active && D.analyses.has(c.id)) return;
   if (c.source_type !== "webcam" && D.analyses.get(c.id)?.fingerprint === c.analysis_revision) return;
   D.loading.add(c.id);
-  try { const a=await request(c.analysis_url); if (a.frames) { D.analyses.set(c.id,a); D.frames.delete(c.id); } }
+  try { const a=await request(c.analysis_url); if (a.frames) { const old=D.analyses.get(c.id); a._mapSeenAt=old?.frames.at(-1)?.time===a.frames.at(-1)?.time ? old._mapSeenAt : Date.now(); D.analyses.set(c.id,a); D.frames.delete(c.id); } }
   catch { /* Catalog polling retries when the backend is available. */ }
   finally { D.loading.delete(c.id); }
 }

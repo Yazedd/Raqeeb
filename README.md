@@ -132,3 +132,32 @@ node tests/browser_webcam.mjs
 The fixture is generated from the supplied video solely for the browser test. The test explicitly starts Chrome with its test camera flags; the production app has no simulated webcam or fallback feed. It verifies browser capture, actual gun-model inference, alert/evidence creation, person snapshots, cross-screen monitoring, camera release on Stop, permission-denied handling, and mobile/RTL layout. Knife confirmation is covered by unit tests; a physical webcam and a real knife scenario have not been validated in this environment.
 
 Implementation references: [browser camera access](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia), [releasing camera tracks](https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack/stop), and [persistent frame-by-frame tracking](https://docs.ultralytics.com/modes/track/).
+
+## Expo 2030 3D map and detection markers
+
+The map from `Y:/Raqeeb-expo2030-3d` is integrated into **Overview**, **Live Monitoring**, and **Live Webcam**, with its existing site geometry and camera placements preserved. `site-map-3d.js` renders the scene locally on a canvas; `site_map.json` contains the editable plan. No external 3D library or build step is required.
+
+- Small blue dots represent people in the current analyzed frame, or the last viewed frame when a recording is paused. The map does not create dots from the full historical person directory. Each anonymous person ID appears once.
+- A person linked to an open incident becomes red and pulses. When that person leaves view, a red incident marker remains at the saved person location. Multiple incidents for the same absent holder share one marker. Resolved and False Positive incidents stop highlighting the person and remove their standalone incident markers.
+- Click a person dot to open its snapshot or review its incident evidence. Open alerts are review state, so red does not assert that a weapon is currently visible in the paused frame.
+- WEB-01 has no assumed site location. Choose its station in **Webcam position** using an existing plan position; this browser's selection persists locally. Unplaced detections are disclosed rather than assigned arbitrary coordinates. Planned camera pins in your original map are planning positions, not added camera feeds.
+- Drag to orbit, scroll or use +/- to zoom, shift-drag to pan, and use the view buttons. Keyboard arrow keys orbit the focused canvas; Home resets the view. Incident pulses respect reduced-motion preferences.
+
+**Placement is camera-relative and approximate**, as selected for this integration. A person's image foot point is projected into the configured camera's heading, field of view, and range. These dots are not measured geographic or calibrated floor locations. A camera can optionally supply `floor_homography`: nine numbers forming a row-major 3x3 matrix mapping normalized image foot points `[u, v, 1]` to site `[x, z, w]`, with the result divided by `w`. Only supply this when you have calibrated that camera against the floor plan.
+
+Paused recordings keep their last observed positions and the HUD identifies them as paused. Stale webcam observations disappear after five seconds, while saved open incidents remain available for review. Offline sources do not generate current person markers. The imported map does not replace any detection, tracking, webcam, or incident-persistence code.
+
+Checks:
+
+```powershell
+node --test tests/test_site_map_tracking.cjs
+.venv\Scripts\python.exe server.py --port 8002 --runtime-dir runtime/map-validation
+```
+
+Against an isolated runtime containing analyzed camera data and observed incidents:
+
+```powershell
+node tests/browser_site_map.mjs
+```
+
+The browser check covers actual recorded-source person dots, incident animation without map rotation, snapshot selection, placement persistence, resolution/false-positive transitions, map lifecycle, dark/light themes, and mobile/RTL layout. It restores the original review statuses after testing. The webcam browser regression also verifies webcam dots at the explicitly selected map station.
